@@ -130,28 +130,21 @@ class Agent:  # Do not change the name of this class!
         :param time_limit: The time limit for the search. Datetime.now() should have lower timestamp value than this.
         :return: The next move.
         """
-        # Greedy action
-        if self.player == 'white': # Move from 0 to 8
-            target_row = 8
-        else:
-            target_row = 0
+        # Greedy Action Selection
+        target_row = 8 if self.player == 'white' else 0
+        oppo_row, oppo_col = board.get_position('white' if self.player == 'black' else 'black')
 
-        oppo_row, oppo_col = board.get_position('white' if self.player == 'black'
-                                                else 'black')
-
-        # Filter out fence actions
         fence_actions = [BLOCK(self.player, *f)
                          for f in board.get_applicable_fences(self.player)
-                         if abs(f[0][0] - oppo_row) < 2 and abs(f[0][1] - oppo_col) < 2]
+                         if abs(f[0][0] - oppo_row) < 2 and abs(f[0][1] - oppo_col) < 2] # Only keep fences that are close to the opponent's pawn
         move_actions = [MOVE(self.player, m)
                         for m in board.get_applicable_moves(self.player)]
 
-        # Filter out moving actions
         move_heuristic = [abs(m.position[0] - target_row) for m in move_actions]
         row_minimize = min(move_heuristic)
         move_actions = [move
                         for move, heuristic in zip(move_actions, move_heuristic)
-                        if heuristic == row_minimize]
+                        if heuristic == row_minimize] # Only keep moves that minimize the row distance to the target
 
         if board.number_of_fences_left(self.player):
             actions = fence_actions + move_actions

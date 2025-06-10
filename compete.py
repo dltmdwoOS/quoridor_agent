@@ -22,7 +22,7 @@ import psutil as pu
 from agents.load import get_all_agents
 from board import GameBoard, InvalidFence, InvalidMove
 # Package for problem definitions
-from evaluator.util import MEGABYTES
+MEGABYTES = 1024 ** 2
 
 #: The number of games to run the evaluation
 GAMES = 10
@@ -46,7 +46,7 @@ def _query(player, player_side, query_queue: Queue, action_queue: Queue):
     board_for_player._initialize()
     while True:
         # Sleep 1 second to avoid blocking
-        sleep(1)
+        sleep(0.1)
         try:
             query = query_queue.get(timeout=TIME_LIMIT * 2)
         except Empty:
