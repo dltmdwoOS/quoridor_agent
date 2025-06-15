@@ -1,261 +1,575 @@
-# CAU57456 Challenge: Algorithm for Quoridor
+## 1. `action.py`
 
-## Overview / 개관
+```python
+import abc
+import logging
+import sys
+from typing import Tuple, Literal
 
+import pyquoridor.board
+from pyquoridor.exceptions import InvalidFence
 
-This semester's programming challenge is to create an agent that plays the Quoridor game.
+IS_DEBUG = '--debug' in sys.argv
+FENCES_MAX = 10
 
-이번 학기의 프로그래밍 도전과제는 쿼리도 게임을 하는 에이전트를 만드는 것입니다.
-
-The challenge consists of 4 problems: (1) Heuristic Search, (2) Local Search, (3) Belief-State Search, and (4) Adversarial Search.
-
-도전과제는 4개의 문제로 구성되어 있습니다: (1) 휴리스틱 탐색, (2) 국소 탐색, (3) 믿음공간 탐색, (4) 적대적 탐색.
-
-Based on this codebase, you need to write a program that solves the 4 parts, and if your performance meets the given criteria below, you will earn points.
-
-이 코드베이스를 기준으로 여러분은 4개 부분을 해결하는 프로그램을 작성하고, 아래에 작성된 기준보다 더 높은 성능을 얻으면 됩니다.
-
-The scoring criteria are categorized into Basic, Intermediate, Advanced, and Challenge levels, and your score will be determined based on whether your agent satisfied each level. You will receive 1 point for submitting working code, 2 points for satisfying the Basic-level criteria, 3 points for satisfying the Intermediate-level criteria, and 4 points for satisfying the Advanced-level criteria. You will earn 5 points for defeating the Challenge-level agent, and there are additional bonus points available. Bonus points are applied without exceeding the total score.
-
-채점 기준은 **기초**, **중급**, **고급**, **도전** 단계로 구분되며, 어떤 단계의 기준을 만족했는지에 따라 점수가 결정됩니다. 동작하는 코드를 제출하였을 때 1점, 기초 에이전트를 이겼을 때 2점, 중급 에이전트를 이겼을 때에는 3점, 고급 에이전트를 이겼을 때에는 4점이 주어집니다. 도전 단계의 에이전트를 이겼을 때에는 5점이 주어지며, 별도의 가산점이 주어지는 항목들이 있습니다. 가산점은 점수 합계를 넘지 않는 선에서 적용됩니다.
-
-Below, the detailed PEAS description for each problem is provided. Please write your code based on the PEAS description.
-
-아래에 각 문제의 PEAS 상세정보가 주어져 있습니다. PEAS 상세정보를 바탕으로 여러분의 코드를 작성하세요.
-
-(Are you curious about how to run the evaluation? Then, go to [RUN](./#RUN) section!)
-
-(어떻게 평가를 실행하는지 궁금하다면, [RUN](./#RUN) 부분으로 넘어가세요!)
-
-## PEAS description
-
-### Performance measure (수행지표)
-
-With one exception, everything follows the basic rules of Quoridor. Unlike the movement rules in Quoridor, in this challenge, the number of turns required to move between each cell varies. For example, moving up from a certain cell may take 3 turns, moving right may take 5 turns, moving left may take 1 turn, and moving down may take 4 turns. Different cells have different movement times. All other rules are the same as in Quoridor.
-
-한 가지 사항을 제외하면, 모든 것은 기본적인 쿼리도의 규칙을 따릅니다. 쿼리도의 이동 규칙과 다르게, 이 도전과제 전체에서는 각 칸 사이의 이동에 소요되는 턴 수가 서로 다릅니다. 예를 들어, 어떤 칸에서 위로 갈 때는 3턴이 걸리고, 오른쪽으로 갈 때는 5턴, 왼쪽으로는 1턴, 아래로는 4턴이 걸릴 수 있습니다. 다른 칸에서는 다른 이동시간이 적용됩니다. 이 외의 모든 규칙은 쿼리도와 동일합니다.
-
-The determination of "winning" is done through absolute evaluation. If any action that is not allowed in basic Quoridor is taken, it will result in disqualification. In addition to the actions that are not allowed in the game, there may be additional disqualification conditions depending on the assignment. In case of disqualification, only the base score of 1 point can be earned.
-
-'이겼다'의 판단은 절대평가로 진행됩니다. 기본적인 쿼리도의 규칙을 따르며, 쿼리도에서 할 수 없는 행동을 한 경우에는 실격됩니다.
-또한, 게임 내 불가능한 행동 외에도 과제에 따라 서로 다른 실격 조건이 추가됩니다. 실격패인 경우, 제출 기본 점수 1점만 얻을 수 있습니다.
-
-#### Part 4. Adversarial Search
-
-The goal of this problem is to achieve the victory, against other player.
-
-이 문제의 목표는 상대편을 이기는 것입니다.
-
-Each turn of yours, the system will provide current board and ask your next single action.
-
-여러분의 차례마다, 시스템이 현재 판의 상태를 여러분에게 제공하고, 여러분의 다음 행동을 물어볼 것입니다.
-
-- Type: Group Assignment
-  형태: 그룹과제
-
-- Disqualification: You will be disqualified if any of the following conditions are violated:
-
-  실격: 다음 조건 중 하나라도 **위반** 하였을 때
-
-  1. For each turn, your algorithm should compute the next action within a minute. 
-  
-     매 턴마다, 알고리즘은 1분 이내에 다음 행동를 계산하여야 한다.
-  2. The additional memory usage of your algorithm should not exceed 1024MB.
-  
-     알고리즘의 추가 메모리 사용량이 1024MB 이내여야 한다.
-  
-- Point system
-  - Basically, your point will be given as the following equation:
-    
-    기본적으로, 여러분의 점수는 다음과 같이 계산됩니다.
-  
-    Point = min[ MAX{ (winning rate in league match) * 6, (winning rate against default) * 3, 1 } , 5 ]
-  
-  - (winning rate in league match): Average winning rate of all match in the league / 리그전 전체 평균 승률
-  
-  - (winning rate against default): Average winning rate against default agent (`default.py`) / 기본 에이전트 (`default`) 대비 평균 승률
-
-#### Environment (환경)
-
-도전과제의 환경 구성은 기본적인 쿼리도 판 구성을 따릅니다.
-
-In terms of seven characteristics, the game can be classified as:
-
-환경을 기술하는 7개의 특징을 기준으로, 게임은 다음과 같이 분류됩니다:
-
-- Fully observable (전체관측가능)
-
-  You know everything required to decide your action.
-
-  여러분은 이미 필요한 모든 내용을 알고 있습니다.
-
-- Competitive Multi-agent (경쟁적 다중 에이전트)
-
-  The other agents will do greedy actions to win the game.
-
-  다른 에이전트들은 게임을 이기기 위하여 탐욕적 행동들을 수행합니다.
-
-- Deterministic (결정론적)
-
-  There's no unexpected chances of change on the board when executing the sequence of actions.
-
-  행동을 순서대로 수행할 때, 예상치 못한 변수가 작용하지 않습니다.
-
-- Sequential actions (순차적 행동)
-
-  You should handle the sequence of your actions to play the game.
-
-  게임 플레이를 위해서 필요한 여러분의 행동의 순서를 고민해야 합니다.
-
-- Semi-dynamic performance (준역동적 지표)
-
-  Some winning conditions are related to dynamic things, such as memory usage or time.
-
-  승리조건의 일부 요소는 메모리나 시간의 영향을 받습니다.
-
-- Discrete action, perception, state and time (이산적인 행동, 지각, 상태 및 시간개념)
-
-  All of your actions, perceptions, states and time will be discrete, although you can query about your current memory usage in the computing procedure.
-
-  여러분의 모든 행동, 지각, 상태 및 시간 흐름은 모두 이산적입니다. 여러분이 계산 도중 메모리 사용량을 시스템에 물어볼 수 있다고 하더라도 말입니다.
-
-- Known rules (규칙 알려짐)
-
-  All rules basically follows the original Quoridor game.
-
-  모든 규칙은 기본적으로 원래의 쿼리도 게임을 따릅니다.
-
-#### Actions
-
-You can take one of the following actions.
-
-다음 행동 중의 하나를 할 수 있습니다.
-
-- **MOVE(direction)**: Move your piece to one of the four directions.
-
-  상하좌우 방향 중 하나로 말 옮기기
-
-- **BLOCK(position)**: Place a block at a position.
-
-  특정한 모서리에 장벽 세워서 막기
-
-  Here, the list of applicable edges will be given by the board.
-
-  도로 짓기가 가능한 모서리의 목록은 board가 제공합니다.
-
-#### Sensors
-
-You can perceive the game state, during the search, as follows:
-
-- The board (게임 판)
-  - Coordinates of pieces and blocks
-
-    모든 말과 장벽의 위치
-
-  - You can ask the board to the list of applicable actions for.
-
-    가능한 행동에 대해서 게임판 객체에 물어볼 수 있습니다.
-
-- The number of total blocks remained (사용가능한, 남은 장벽 수)
-
-## Structure of evaluation system
-
-평가 시스템의 구조
-
-The evaluation code has the following structure.
-
-평가용 코드는 다음과 같은 구조를 가지고 있습니다.
-
-```text
-/                   ... The root of this project
-/README.md          ... This README file
-/compete.py         ... The entrance file to run the final evaluation code (as a league match)
-/board.py           ... The file that specifies programming interface with the board
-/actions.py         ... The file that specifies actions to be called
-/util.py            ... The file that contains several utilities for board and action definitions.
-/agents             ... Directory that contains multiple agents to be tested.
-/agents/__init__.py ... Helper code for loading agents to be evaluated
-/agents/load.py     ... Helper code for loading agents to be evaluated
-/agents/default.py  ... A randomized agent.
-/agents/_skeleton.py... A skeleton code for your agent. (You should change the name of file to run your code)
 ```
 
-All the codes have documentation that specifies what's happening on that code (only in English).
+### 1.1. 클래스 `Action` (추상 클래스)
 
-모든 코드는 어떤 동작을 하는 코드인지에 대한 설명이 달려있습니다 (단, 영어로만).
+- **속성**
+    - `_logger`: `logging.Logger` — 액션 수행 시 디버깅 로그를 남기는 데 사용
+- **메서드**
+    - `__call__(self, board, avoid_check=False)`
+        - **추상 메서드**. 하위 클래스에서 구현
+        - **파라미터**
+            - `board`: `GameBoard` 인스턴스
+            - `avoid_check` (`bool`): `True`이면 승리 검사(`check_winner`) 등을 생략
+        - **동작**: 주어진 `board` 객체에 액션을 실행 또는 시뮬레이션
+        - **사용 주의**: 직접 호출 불가. 하위 클래스(`MOVE`, `BLOCK`)에서 구현됨.
 
-To deeply understand the `board.py` and `actions.py`, you may need some knowlege about [`pyquoridor` library](https://github.com/playquoridor/python-quoridor).
+---
 
-`board.py`와 `actions.py`를 깊게 이해하고 싶다면, [`pyquoridor` library](https://github.com/playquoridor/python-quoridor) 라이브러리에 대한 지식이 필요할 수 있습니다.
+### 1.2. 클래스 `MOVE(Action)`
 
-### What should I submit?
+페awns(말)를 지정한 위치로 이동하는 액션
 
-You should submit an agent python file, which has a similar structure to `/agents/default.py`.
-That file should contain a class name `Agent` and that `Agent` class should have a method named `heuristic_search(board)`, `local_search(board, time_limit)`, `belief_state_search(board, time_limit)`, and `adversarial_search(board, time_limit)`.
-Please use `/agents/_skeleton.py` as a skeleton code for your submission.
+- **생성자** `__init__(self, player: Literal['black','white'], position: Tuple[int,int])`
+    - `player`: `'black'` 또는 `'white'`
+    - `position`: 이동할 칸의 `(row, col)` 좌표
+    - **검사**: `player`가 `'black'`/`'white'`가 아니면 `AssertionError`
+- **표현** `__repr__(self) -> str`
+    - 예: `MOVE(4,5) of white`
+- **실행** `__call__(self, board, avoid_check=False)`
+    - 내부적으로 `board._board.move_pawn(...)` 호출
+    - `IS_DEBUG=True`면 디버깅 로그 출력
+    - 잘못된 이동 시 `pyquoridor.exceptions.InvalidMove`, 또는 게임 종료 시 `GameOver` 발생
 
-`/agents/default.py`와 비슷하게 생긴 에이전트 코드를 담은 파이썬 파일을 제출해야 합니다.
-해당 코드는 `Agent`라는 클래스가 있어야 하고, `Agent` 클래스는 `heuristic_search(board)`, `local_search(board, time_limit)`, `belief_state_search(board, time_limit)` 및 `adversarial_search(board, time_limit)` 메서드를 가지고 있어야 합니다.
-편의를 위해서 `/agents/_skeleton.py`를 골격 코드로 사용하여 제출하세요.
+---
 
-Also, you cannot use the followings to reduce your search time:
+### 1.3. 클래스 `BLOCK(Action)`
 
-그리고 시간을 줄이기 위해서 다음에 나열하는 것을 사용하는 행위는 제한됩니다.
+격자 모서리에 장벽(fence)을 설치하는 액션
 
-- multithreading / 멀티스레딩
-- multiprocessing / 멀티프로세싱
-- using other libraries other than basic python libraries. / 기본 파이썬 라이브러리 이외에 다른 라이브러리를 사용하는 행위
+- **생성자**
+    
+    `__init__(self, player: Literal['black','white'], edge: Tuple[int,int], orientation: Literal['horizontal','vertical'])`
+    
+    - `player`: `'black'` 또는 `'white'`
+    - `edge`: 장벽 중심 좌표 `(row, col)`
+    - `orientation`: `'horizontal'` 또는 `'vertical'`
+    - 내부적으로 `orientation[0]` (`'h'`/`'v'`) 저장
+    - **검사**: 남은 장벽 수(`board._board.fences_left`) 확인, 플레이어 유효성
+- **표현** `__repr__(self) -> str`
+    - 예: `BLOCK_h(3,2) of player black`
+- **실행** `__call__(self, board, avoid_check=False)`
+    - 남은 장벽 수 확인 후 `board._board.place_fence(...)` 호출
+    - 성공 시 `board._fences` 리스트에 `(edge, orientation)` 추가
+    - 잘못된 설치 시 `pyquoridor.exceptions.InvalidFence`, 또는 게임 종료 시 `GameOver` 발생
 
-The TA will check whether you use those things or not. If so, then your evaluation result will be marked as zero.
+---
 
-조교가 여러분이 해당 사항을 사용하였는지 아닌지 확인하게 됩니다. 만약 그렇다면, 해당 평가 점수는 0점으로 처리됩니다.
+### 1.4. 상수
 
-## RUN
+- `FENCES_MAX = 10`: 플레이어별 최대 장벽 수
 
-실행
+---
 
-To run the evaluation code, do the following:
+## 2. `board.py`
 
-1. (Only at the first run) Install the required libraries, by run the following code on your terminal or powershell, etc:
+```python
+python
+복사편집
+import heapq, logging, os, random, sys
+from copy import deepcopy
+from random import randint as random_integer
+from typing import Tuple, List, Literal
 
-   (최초 실행인 경우만) 다음 코드를 터미널이나 파워쉘 등에서 실행하여, 필요한 라이브러리를 설치하세요.
+from psutil import Process as PUInfo, NoSuchProcess
+from pyquoridor.board import Board
+from pyquoridor.exceptions import GameOver, InvalidFence, InvalidMove
+from pyquoridor.square import MAX_COL, MAX_ROW
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+from action import Action, BLOCK, MOVE, FENCES_MAX
+from util import print_board
 
-2. Place your code under `/agents` directory.
+IS_DEBUG = '--debug' in sys.argv
+IS_RUN   = 'fixed_evaluation' in sys.argv[0]
 
-    여러분의 코드를 `/agents` 디렉터리 밑에 위치시키세요.
+```
 
-3. Execute the evaluation code, by run the following code on a terminal/powershell:
+### 클래스 `GameBoard`
 
-    다음 코드를 실행하여 평가 코드를 실행하세요.
+Quoridor 게임 보드를 래핑(wrap)하여 **Agent** 구현에 필요한 퍼블릭 API 제공
 
-    ```bash 
-    python compete.py -p [AGENTS]
-    ```
-   
-    Here, `[AGENTS]` indicates agent names that you will compare. For example, if you want to make a league match between `agent_a`, `agent_b`, and `agent_c`, type:
+### 2.1. Private 속성
 
-    여기서, `[AGENTS]`는 비교할 에이전트의 이름입니다. 예를 들어, `agent_a`, `agent_b`, `agent_c` 사이에 리그전 경기를 만들고 싶다면, 아래와 같이 실행하세요:
+- `_board`: 내부 `pyquoridor.board.Board` 인스턴스
+- `_current_player`: 현재 차례 플레이어 (`'white'`/`'black'`)
+- `_initial`, `_current`: 상태 표현(`dict`)을 저장
+- `_fences`: 설치된 장벽 리스트
+- `_process_info`, `_init_memory`, `_max_memory`: 메모리 사용량 추적
+- `_rng`: 내부 난수 생성기
+- `_logger`: 로깅용
 
-    ```bash 
-    python compete.py -p agent_a agent_b agent_c
-    ```
+---
 
-    If you want to print out all computational procedure, then put `--debug` at the end of python call, as follows:
+### 2.2. 초기화 & 상태 복원
 
-    만약, 모든 계산 과정을 출력해서 보고 싶다면, `--debug`을 파이썬 호출 부분 뒤에 붙여주세요.
+- **`_initialize(self, start_with_random_fence: int = 0)`** – **(private)**
+    - 평가용. 새 게임판 생성, 내부 상태 초기화, 메모리 트래킹 시작
+    - **절대** Agent 코드에서 호출 불가
+- **`reset_memory_usage(self)`**
+    - `_init_memory`, `_max_memory` 초기화 후 즉시 메모리 갱신
+- **`set_to_state(self, specific_state: dict=None, is_initial: bool=False)`**
+    - `specific_state` 딕셔너리를 기반으로 `_board` 상태 완전 복원
+    - `is_initial=True`이면 `_initial` 상태로 덮어쓰기
 
-    ```bash 
-    python compete.py -p agent_a agent_b agent_c --debug
-    ```
+---
 
-4. See what's happening.
+### 2.3. 게임 진행 정보 조회
 
-    어떤 일이 일어나는지를 관찰하세요.
+- **`is_game_end(self) -> bool`**
+    
+    현재 상태가 게임 종료인지(`Board.game_finished()`) 반환
+    
+- **`current_player(self) -> Literal['white','black']`**
+    
+    내부 보드의 `current_player()` 반환
+    
+- **`get_state(self) -> dict`**
+    
+    현재 상태 표현을 딥카피하여 반환
+    
+- **`get_initial_state(self) -> dict`**
+    
+    초기화된 상태 표현(첫 상태) 딥카피 반환
+    
+- **`get_position(self, player: Literal['white','black']) -> Tuple[int,int]`**
+    
+    해당 플레이어 말의 `(row, col)` 좌표 반환
+    
 
-Note: All the codes are tested both on (1) Windows 11 (23H2) with Python 3.9.13 and (2) Ubuntu 22.04 with Python 3.10. Sorry for Mac users, because you may have some unexpected errors.
+---
 
-모든 코드는 윈도우 11 (23H2)와 파이썬 3.9.13 환경과, 우분투 22.04와 파이썬 3.10 환경에서 테스트되었습니다. 예측불가능한 오류가 발생할 수도 있어, 미리 맥 사용자에게 미안하다는 말을 전합니다.
+### 2.4. 가능 행동 목록 조회
+
+- **`get_applicable_moves(self, player: Literal['white','black']=None) -> List[Tuple[int,int]]`**
+    1. 인자로 받은(또는 현재 차례) 플레이어가 이동 가능한 모든 칸 좌표 리스트
+    2. 내부적으로 `Board.valid_pawn_moves(..., check_winner=False)` 사용
+    3. 메모리 사용량 갱신
+- **`get_applicable_fences(self, player: Literal['white','black']=None) -> List[Tuple[Tuple[int,int], str]]`**
+    1. 남은 장벽 수 확인
+    2. 보드 전 영역 순회하며 설치 가능한 `(edge, orientation)` 수집
+    3. 메모리 사용량 갱신
+- **`number_of_fences_left(self, player: Literal['white','black']) -> int`**
+    
+    해당 플레이어의 남은 장벽 수
+    
+
+---
+
+### 2.5. 메모리 사용량 조회
+
+- **`get_current_memory_usage(self) -> int`**
+    
+    프로세스의 현재 메모리(USS) 반환
+    
+- **`get_max_memory_usage(self) -> int`**
+    
+    세션 시작 이후 최대 메모리 사용량 차이(`_max_memory - _init_memory`) 반환
+    
+
+---
+
+### 2.6. 액션 시뮬레이션
+
+- **`simulate_action(self, state: dict=None, *actions: Action) -> dict`**
+    1. `state`(없으면 `_initial`)로 복원
+    2. 순서대로 `actions`를 `__call__` 실행
+    3. 게임 종료(`GameOver`) 발생 시 중단
+    4. 최종 상태를 `_current`에 저장 & 딥카피 반환
+    5. 메모리 사용량 갱신
+
+---
+
+### 2.7. Private 헬퍼
+
+- **`_update_memory_usage(self)`** – `_max_memory` 갱신
+- **`_unique_game_state_identifier(self) -> str`** – `Board.partial_FEN()`
+- **`_save_state(self) -> dict`** – 현재 상태를 딕셔너리로 직렬화
+- **`_restore_state(self, state: dict)`** – `_save_state` 포맷 복원
+
+> Note: 위 모두 언더바(_)로 시작하므로 Agent 코드에서 직접 사용 불가
+> 
+
+---
+
+### 2.8. 모듈 상수 및 export
+
+```python
+python
+복사편집
+__all__ = ['GameBoard', 'IS_DEBUG', 'IS_RUN']
+
+```
+
+- `IS_DEBUG`, `IS_RUN`: 실행 모드 플래그
+- `GameBoard`: Agent가 사용할 유일한 클래스
+
+---
+
+## 3. `compete.py`
+
+```python
+python
+복사편집
+import logging, random, psutil as pu
+from argparse import ArgumentParser
+from collections import defaultdict
+from multiprocessing import Process, Queue
+from queue import Empty
+from random import seed, shuffle, randint
+from time import time, sleep
+from traceback import format_exc
+from itertools import combinations
+
+from agents.load import get_all_agents
+from board import GameBoard, InvalidFence, InvalidMove
+from evaluator.util import MEGABYTES
+
+GAMES       = 10
+TIME_LIMIT  = 60
+MEMORY_LIMIT= 1024
+QUIT_SIGNAL = 'QUIT'
+
+```
+
+### 3.1. Private 함수
+
+- **`_query(player, player_side, query_queue: Queue, action_queue: Queue)`**
+    - 에이전트 모듈 로드 → `Agent(player_side)` 인스턴스화
+    - `GameBoard._initialize()` → 루프
+        - `query_queue`로 받은 상태로 `set_to_state`
+        - `adversarial_search(...)` 호출 → `action_queue`에 결과 전송
+- **`_execute(player, player_side, query_queue, action_queue) -> Process`**
+    - 별도 프로세스로 `_query` 실행
+- **`_info(msg)`**
+    - `logging.info` + `print`
+
+> 이 셋 모두 평가 시스템 내부용이며, Agent 구현 시 전혀 사용할 일이 없습니다.
+> 
+
+---
+
+### 3.2. 메인 블록 (`if __name__ == '__main__':`)
+
+1. **인자 파싱** (`p`, `-players`, `-debug`)
+2. **로거 설정**
+3. **리그 매치**
+    - 플레이어 조합별 총 `GAMES`번 대결
+    - 백·흑 무작위 배정 → `GameBoard` 초기화
+    - `_execute`로 프로세스 시작
+    - 매 턴마다
+        1. `query_queue`에 상태 전송
+        2. `action_queue`에서 `TIME_LIMIT+5`초 이내 응답 대기
+        3. 메모리·시간 초과, 예외 발생 시 패배 결정
+        4. `simulate_action`으로 보드 업데이트
+    - 승패 집계 및 로그 출력
+
+---
+
+### 3.3. 핵심 예외 처리
+
+- `Empty` (Timeout)
+- `InvalidFence`, `InvalidMove` (잘못된 액션)
+- `GameOver` (게임 종료 감지)
+- 메모리 오버플로우(1024 MB 초과)
+- **결과**: 에러 발생 시 상대방 승리 처리## 1. `action.py`
+
+```python
+python
+복사편집
+import abc
+import logging
+import sys
+from typing import Tuple, Literal
+
+import pyquoridor.board
+from pyquoridor.exceptions import InvalidFence
+
+IS_DEBUG = '--debug' in sys.argv
+FENCES_MAX = 10
+
+```
+
+### 1.1. 클래스 `Action` (추상 클래스)
+
+- **속성**
+    - `_logger`: `logging.Logger` — 액션 수행 시 디버깅 로그를 남기는 데 사용
+- **메서드**
+    - `__call__(self, board, avoid_check=False)`
+        - **추상 메서드**. 하위 클래스에서 구현
+        - **파라미터**
+            - `board`: `GameBoard` 인스턴스
+            - `avoid_check` (`bool`): `True`이면 승리 검사(`check_winner`) 등을 생략
+        - **동작**: 주어진 `board` 객체에 액션을 실행 또는 시뮬레이션
+        - **사용 주의**: 직접 호출 불가. 하위 클래스(`MOVE`, `BLOCK`)에서 구현됨.
+
+---
+
+### 1.2. 클래스 `MOVE(Action)`
+
+페awns(말)를 지정한 위치로 이동하는 액션
+
+- **생성자** `__init__(self, player: Literal['black','white'], position: Tuple[int,int])`
+    - `player`: `'black'` 또는 `'white'`
+    - `position`: 이동할 칸의 `(row, col)` 좌표
+    - **검사**: `player`가 `'black'`/`'white'`가 아니면 `AssertionError`
+- **표현** `__repr__(self) -> str`
+    - 예: `MOVE(4,5) of white`
+- **실행** `__call__(self, board, avoid_check=False)`
+    - 내부적으로 `board._board.move_pawn(...)` 호출
+    - `IS_DEBUG=True`면 디버깅 로그 출력
+    - 잘못된 이동 시 `pyquoridor.exceptions.InvalidMove`, 또는 게임 종료 시 `GameOver` 발생
+
+---
+
+### 1.3. 클래스 `BLOCK(Action)`
+
+격자 모서리에 장벽(fence)을 설치하는 액션
+
+- **생성자**
+    
+    `__init__(self, player: Literal['black','white'], edge: Tuple[int,int], orientation: Literal['horizontal','vertical'])`
+    
+    - `player`: `'black'` 또는 `'white'`
+    - `edge`: 장벽 중심 좌표 `(row, col)`
+    - `orientation`: `'horizontal'` 또는 `'vertical'`
+    - 내부적으로 `orientation[0]` (`'h'`/`'v'`) 저장
+    - **검사**: 남은 장벽 수(`board._board.fences_left`) 확인, 플레이어 유효성
+- **표현** `__repr__(self) -> str`
+    - 예: `BLOCK_h(3,2) of player black`
+- **실행** `__call__(self, board, avoid_check=False)`
+    - 남은 장벽 수 확인 후 `board._board.place_fence(...)` 호출
+    - 성공 시 `board._fences` 리스트에 `(edge, orientation)` 추가
+    - 잘못된 설치 시 `pyquoridor.exceptions.InvalidFence`, 또는 게임 종료 시 `GameOver` 발생
+
+---
+
+### 1.4. 상수
+
+- `FENCES_MAX = 10`: 플레이어별 최대 장벽 수
+
+---
+
+## 2. `board.py`
+
+```python
+python
+복사편집
+import heapq, logging, os, random, sys
+from copy import deepcopy
+from random import randint as random_integer
+from typing import Tuple, List, Literal
+
+from psutil import Process as PUInfo, NoSuchProcess
+from pyquoridor.board import Board
+from pyquoridor.exceptions import GameOver, InvalidFence, InvalidMove
+from pyquoridor.square import MAX_COL, MAX_ROW
+
+from action import Action, BLOCK, MOVE, FENCES_MAX
+from util import print_board
+
+IS_DEBUG = '--debug' in sys.argv
+IS_RUN   = 'fixed_evaluation' in sys.argv[0]
+
+```
+
+### 클래스 `GameBoard`
+
+Quoridor 게임 보드를 래핑(wrap)하여 **Agent** 구현에 필요한 퍼블릭 API 제공
+
+### 2.1. Private 속성
+
+- `_board`: 내부 `pyquoridor.board.Board` 인스턴스
+- `_current_player`: 현재 차례 플레이어 (`'white'`/`'black'`)
+- `_initial`, `_current`: 상태 표현(`dict`)을 저장
+- `_fences`: 설치된 장벽 리스트
+- `_process_info`, `_init_memory`, `_max_memory`: 메모리 사용량 추적
+- `_rng`: 내부 난수 생성기
+- `_logger`: 로깅용
+
+---
+
+### 2.2. 초기화 & 상태 복원
+
+- **`_initialize(self, start_with_random_fence: int = 0)`** – **(private)**
+    - 평가용. 새 게임판 생성, 내부 상태 초기화, 메모리 트래킹 시작
+    - **절대** Agent 코드에서 호출 불가
+- **`reset_memory_usage(self)`**
+    - `_init_memory`, `_max_memory` 초기화 후 즉시 메모리 갱신
+- **`set_to_state(self, specific_state: dict=None, is_initial: bool=False)`**
+    - `specific_state` 딕셔너리를 기반으로 `_board` 상태 완전 복원
+    - `is_initial=True`이면 `_initial` 상태로 덮어쓰기
+
+---
+
+### 2.3. 게임 진행 정보 조회
+
+- **`is_game_end(self) -> bool`**
+    
+    현재 상태가 게임 종료인지(`Board.game_finished()`) 반환
+    
+- **`current_player(self) -> Literal['white','black']`**
+    
+    내부 보드의 `current_player()` 반환
+    
+- **`get_state(self) -> dict`**
+    
+    현재 상태 표현을 딥카피하여 반환
+    
+- **`get_initial_state(self) -> dict`**
+    
+    초기화된 상태 표현(첫 상태) 딥카피 반환
+    
+- **`get_position(self, player: Literal['white','black']) -> Tuple[int,int]`**
+    
+    해당 플레이어 말의 `(row, col)` 좌표 반환
+    
+
+---
+
+### 2.4. 가능 행동 목록 조회
+
+- **`get_applicable_moves(self, player: Literal['white','black']=None) -> List[Tuple[int,int]]`**
+    1. 인자로 받은(또는 현재 차례) 플레이어가 이동 가능한 모든 칸 좌표 리스트
+    2. 내부적으로 `Board.valid_pawn_moves(..., check_winner=False)` 사용
+    3. 메모리 사용량 갱신
+- **`get_applicable_fences(self, player: Literal['white','black']=None) -> List[Tuple[Tuple[int,int], str]]`**
+    1. 남은 장벽 수 확인
+    2. 보드 전 영역 순회하며 설치 가능한 `(edge, orientation)` 수집
+    3. 메모리 사용량 갱신
+- **`number_of_fences_left(self, player: Literal['white','black']) -> int`**
+    
+    해당 플레이어의 남은 장벽 수
+    
+
+---
+
+### 2.5. 메모리 사용량 조회
+
+- **`get_current_memory_usage(self) -> int`**
+    
+    프로세스의 현재 메모리(USS) 반환
+    
+- **`get_max_memory_usage(self) -> int`**
+    
+    세션 시작 이후 최대 메모리 사용량 차이(`_max_memory - _init_memory`) 반환
+    
+
+---
+
+### 2.6. 액션 시뮬레이션
+
+- **`simulate_action(self, state: dict=None, *actions: Action) -> dict`**
+    1. `state`(없으면 `_initial`)로 복원
+    2. 순서대로 `actions`를 `__call__` 실행
+    3. 게임 종료(`GameOver`) 발생 시 중단
+    4. 최종 상태를 `_current`에 저장 & 딥카피 반환
+    5. 메모리 사용량 갱신
+
+---
+
+### 2.7. Private 헬퍼
+
+- **`_update_memory_usage(self)`** – `_max_memory` 갱신
+- **`_unique_game_state_identifier(self) -> str`** – `Board.partial_FEN()`
+- **`_save_state(self) -> dict`** – 현재 상태를 딕셔너리로 직렬화
+- **`_restore_state(self, state: dict)`** – `_save_state` 포맷 복원
+
+> Note: 위 모두 언더바(_)로 시작하므로 Agent 코드에서 직접 사용 불가
+> 
+
+---
+
+### 2.8. 모듈 상수 및 export
+
+```python
+python
+복사편집
+__all__ = ['GameBoard', 'IS_DEBUG', 'IS_RUN']
+
+```
+
+- `IS_DEBUG`, `IS_RUN`: 실행 모드 플래그
+- `GameBoard`: Agent가 사용할 유일한 클래스
+
+---
+
+## 3. `compete.py`
+
+```python
+python
+복사편집
+import logging, random, psutil as pu
+from argparse import ArgumentParser
+from collections import defaultdict
+from multiprocessing import Process, Queue
+from queue import Empty
+from random import seed, shuffle, randint
+from time import time, sleep
+from traceback import format_exc
+from itertools import combinations
+
+from agents.load import get_all_agents
+from board import GameBoard, InvalidFence, InvalidMove
+from evaluator.util import MEGABYTES
+
+GAMES       = 10
+TIME_LIMIT  = 60
+MEMORY_LIMIT= 1024
+QUIT_SIGNAL = 'QUIT'
+
+```
+
+### 3.1. Private 함수
+
+- **`_query(player, player_side, query_queue: Queue, action_queue: Queue)`**
+    - 에이전트 모듈 로드 → `Agent(player_side)` 인스턴스화
+    - `GameBoard._initialize()` → 루프
+        - `query_queue`로 받은 상태로 `set_to_state`
+        - `adversarial_search(...)` 호출 → `action_queue`에 결과 전송
+- **`_execute(player, player_side, query_queue, action_queue) -> Process`**
+    - 별도 프로세스로 `_query` 실행
+- **`_info(msg)`**
+    - `logging.info` + `print`
+
+> 이 셋 모두 평가 시스템 내부용이며, Agent 구현 시 전혀 사용할 일이 없습니다.
+> 
+
+---
+
+### 3.2. 메인 블록 (`if __name__ == '__main__':`)
+
+1. **인자 파싱** (`p`, `-players`, `-debug`)
+2. **로거 설정**
+3. **리그 매치**
+    - 플레이어 조합별 총 `GAMES`번 대결
+    - 백·흑 무작위 배정 → `GameBoard` 초기화
+    - `_execute`로 프로세스 시작
+    - 매 턴마다
+        1. `query_queue`에 상태 전송
+        2. `action_queue`에서 `TIME_LIMIT+5`초 이내 응답 대기
+        3. 메모리·시간 초과, 예외 발생 시 패배 결정
+        4. `simulate_action`으로 보드 업데이트
+    - 승패 집계 및 로그 출력
+
+---
+
+### 3.3. 핵심 예외 처리
+
+- `Empty` (Timeout)
+- `InvalidFence`, `InvalidMove` (잘못된 액션)
+- `GameOver` (게임 종료 감지)
+- 메모리 오버플로우(1024 MB 초과)
+- **결과**: 에러 발생 시 상대방 승리 처리
